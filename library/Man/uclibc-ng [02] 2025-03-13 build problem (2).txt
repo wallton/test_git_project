@@ -1,0 +1,33 @@
+
+billylin@billylin-VirtualBox:~/yllib__mybase/test_git_project$ make -C library/ all
+make: Entering directory '/home/billylin/yllib__mybase/test_git_project/library'
+Building uClibc-ng...
+make[1]: Entering directory '/home/billylin/yllib__mybase/test_git_project/library/uclibc-ng'
+  GEN include/bits/uClibc_config.h
+  CC ldso/ldso/ldso.oS
+In file included from /usr/src/linux-hwe-5.15-headers-5.15.0-134/include/linux/types.h:6,
+                 from /usr/src/linux-hwe-5.15-headers-5.15.0-134/include/linux/limits.h:6,
+                 from ./include/bits/local_lim.h:38,
+                 from ./include/bits/posix1_lim.h:152,
+                 from ./include/limits.h:144,
+                 from ./include/sys/param.h:25,
+                 from ./ldso/include/ldso.h:49,
+                 from ldso/ldso/ldso.c:32:
+/usr/src/linux-hwe-5.15-headers-5.15.0-134/include/uapi/linux/types.h:5:10: fatal error: asm/types.h: No such file or directory
+    5 | #include <asm/types.h>
+      |          ^~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [Makerules:374: ldso/ldso/ldso.oS] Error 1
+make[1]: Leaving directory '/home/billylin/yllib__mybase/test_git_project/library/uclibc-ng'
+make: *** [Makefile:52: build] Error 2
+make: Leaving directory '/home/billylin/yllib__mybase/test_git_project/library'
+
+
+
++----------------------------------------
++========================================
+
+
+
+
+

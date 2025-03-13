@@ -1,0 +1,164 @@
+
+Building uClibc-ng...
+make[1]: Entering directory '/home/billylin/yllib__mybase/test_git_project/Lib-uclibc-ng/uclibc-ng'
+  HOSTCC-o extra/config/conf.o
+  HOSTCC extra/config/conf
+  MKDIR include/bits
+  GEN include/bits/uClibc_config.h
+  GEN include/bits/sysnum.h
+  LN include/fpu_control.h
+  LN include/jmpbuf-offsets.h
+  LN include/jmpbuf-unwind.h
+  LN include/dl-osinfo.h
+  LN include/not-cancel.h
+  LN include/bits/hwcap.h
+  LN include/bits/uClibc_fpmax.h
+  LN include/bits/mqueue.h
+  LN include/bits/statvfs.h
+  LN include/bits/netdb.h
+  LN include/bits/socket.h
+  LN include/bits/poll.h
+  LN include/bits/resource.h
+  LN include/bits/uClibc_charclass.h
+  LN include/bits/cmathcalls.h
+  LN include/bits/utmpx.h
+  LN include/bits/sigset.h
+  LN include/bits/uClibc_mutex.h
+  LN include/bits/local_lim.h
+  LN include/bits/kernel-features.h
+  LN include/bits/sched.h
+  LN include/bits/uClibc_uwchar.h
+  LN include/bits/mman-linux.h
+  LN include/bits/mman-common.h
+  LN include/bits/uio.h
+  LN include/bits/eventfd.h
+  LN include/bits/huge_val.h
+  LN include/bits/locale.h
+  LN include/bits/utmp.h
+  LN include/bits/mathcalls.h
+  LN include/bits/sockaddr.h
+  LN include/bits/select.h
+  LN include/bits/ustat.h
+  LN include/bits/xopen_lim.h
+  LN include/bits/posix_opt.h
+  LN include/bits/uClibc_uintmaxtostr.h
+  LN include/bits/kernel_sigaction.h
+  LN include/bits/sigaction.h
+  LN include/bits/inotify.h
+  LN include/bits/uClibc_stdio.h
+  LN include/bits/inf.h
+  LN include/bits/waitstatus.h
+  LN include/bits/stdio.h
+  LN include/bits/statx.h
+  LN include/bits/dirent.h
+  LN include/bits/mman-shared.h
+  LN include/bits/elfclass.h
+  LN include/bits/initspin.h
+  LN include/bits/uClibc_posix_opt.h
+  LN include/bits/types.h
+  LN include/bits/time.h
+  LN include/bits/uClibc_touplow.h
+  LN include/bits/signum.h
+  LN include/bits/uClibc_local_lim.h
+  LN include/bits/ioctl-types.h
+  LN include/bits/byteswap-16.h
+  LN include/bits/wchar.h
+  LN include/bits/timerfd.h
+  LN include/bits/fcntl-linux.h
+  LN include/bits/uClibc_alloc.h
+  LN include/bits/socket_type.h
+  LN include/bits/nan.h
+  LN include/bits/waitflags.h
+  LN include/bits/jmp_buf_tag.h
+  LN include/bits/huge_vall.h
+  LN include/bits/huge_valf.h
+  LN include/bits/typesizes.h
+  LN include/bits/ioctls.h
+  LN include/bits/sigstack.h
+  LN include/bits/signalfd.h
+  LN include/bits/termios.h
+  LN include/bits/sigthread.h
+  LN include/bits/siginfo.h
+  LN include/bits/getopt_int.h
+  LN include/bits/uClibc_ctype.h
+  LN include/bits/confname.h
+  LN include/bits/uClibc_page.h
+  LN include/bits/posix2_lim.h
+  LN include/bits/byteswap-common.h
+  LN include/bits/dlfcn.h
+  LN include/bits/fenvinline.h
+  LN include/bits/uClibc_pthread.h
+  LN include/bits/errno.h
+  LN include/bits/getopt.h
+  LN include/bits/statfs.h
+  LN include/bits/stdio_lim.h
+  LN include/bits/uClibc_va_copy.h
+  LN include/bits/syscalls-common.h
+  LN include/bits/utsname.h
+  LN include/bits/ipc.h
+  LN include/bits/posix1_lim.h
+  LN include/bits/uClibc_clk_tck.h
+  LN include/bits/uClibc_locale.h
+  LN include/bits/in.h
+  LN include/bits/fcntl.h
+  LN include/bits/byteswap.h
+  LN include/bits/syscalls.h
+  LN include/bits/shm.h
+  LN include/bits/epoll.h
+  LN include/bits/sem.h
+  LN include/bits/mman.h
+  LN include/bits/atomic.h
+  LN include/bits/kernel_stat.h
+  LN include/bits/sigcontext.h
+  LN include/bits/msq.h
+  LN include/bits/uClibc_arch_features.h
+  LN include/bits/kernel_types.h
+  LN include/bits/environments.h
+  LN include/bits/fenv.h
+  LN include/bits/wordsize.h
+  LN include/bits/endian.h
+  LN include/bits/mathdef.h
+  LN include/bits/stat.h
+  LN include/bits/mathinline.h
+  LN include/bits/stackinfo.h
+  LN include/bits/setjmp.h
+  LN include/bits/sigcontextinfo.h
+  LN include/sys/timerfd.h
+  LN include/sys/prctl.h
+  LN include/sys/fanotify.h
+  LN include/sys/epoll.h
+  LN include/sys/acct.h
+  LN include/sys/random.h
+  LN include/sys/eventfd.h
+  LN include/sys/signalfd.h
+  LN include/sys/inotify.h
+  LN include/sys/ptrace.h
+  LN include/sys/perm.h
+  LN include/sys/ucontext.h
+  LN include/sys/io.h
+  LN include/sys/reg.h
+  LN include/sys/debugreg.h
+  LN include/sys/procfs.h
+  LN include/sys/user.h
+  MKDIR libubacktrace/x86_64
+  CC ldso/ldso/ldso.oS
+In file included from ./include/bits/posix1_lim.h:152,
+                 from ./include/limits.h:144,
+                 from ./include/sys/param.h:25,
+                 from ./ldso/include/ldso.h:49,
+                 from ldso/ldso/ldso.c:32:
+./include/bits/local_lim.h:38:10: fatal error: linux/limits.h: No such file or directory
+   38 | #include <linux/limits.h>
+      |          ^~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [Makerules:374: ldso/ldso/ldso.oS] Error 1
+make[1]: Leaving directory '/home/billylin/yllib__mybase/test_git_project/Lib-uclibc-ng/uclibc-ng'
+make: *** [Makefile:42: build] Error 2
+make: Leaving directory '/home/billylin/yllib__mybase/test_git_project/Lib-uclibc-ng'
+
+
++----------------------------------------
++========================================
+
+
+
