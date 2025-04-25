@@ -1,0 +1,42 @@
+
+billylin@billylin-VirtualBox:~/yllib__mybase/test_git_project$ make -C library/ test
+make: Entering directory '/home/billylin/yllib__mybase/test_git_project/library'
+gcc -o test test.c 
+    -I/home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/include 
+    -L/home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/lib 
+    -lc -nostdlib 
+    -Wl,--dynamic-linker=/home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/run/lib/ld64-uClibc.so.0
+
+
+In file included from /home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/include/stdio.h:27,
+                 from test.c:1:
+/home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/include/features.h:372: warning: "__STDC_IEC_559__" redefined
+  372 | #define __STDC_IEC_559__  1
+      |
+In file included from <command-line>:31:
+/usr/include/stdc-predef.h:38: note: this is the location of the previous definition
+   38 | #  define __STDC_IEC_559__  1
+      |
+In file included from /home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/include/stdio.h:27,
+                 from test.c:1:
+/home/billylin/yllib__mybase/test_git_project/library/buildDir/uclibc-ng/dev/include/features.h:373: warning: "__STDC_IEC_559_COMPLEX__" redefined
+  373 | #define __STDC_IEC_559_COMPLEX__ 1
+      |
+In file included from <command-line>:31:
+/usr/include/stdc-predef.h:46: note: this is the location of the previous definition
+   46 | #  define __STDC_IEC_559_COMPLEX__ 1
+      |
+/usr/bin/ld: cannot find /uclibc-ng/run/lib/libc.so.1
+/usr/bin/ld: cannot find /uclibc-ng/dev/lib/uclibc_nonshared.a
+/usr/bin/ld: cannot find /uclibc-ng/run/lib/ld64-uClibc.so.1
+collect2: error: ld returned 1 exit status
+make: *** [Makefile:21: test] Error 1
+make: Leaving directory '/home/billylin/yllib__mybase/test_git_project/library'
+
+
++----------------------------------------
++========================================
+
+
+
+
