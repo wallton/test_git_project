@@ -159,6 +159,14 @@ make: Leaving directory '/home/billylin/yllib__mybase/test_git_project/Lib-uclib
 
 +----------------------------------------
 +========================================
+解法:
+指向 kernel header
+
+
+make CFLAGS="-I/tmp/kernel-headers/include"
+
+
+
 
 
 

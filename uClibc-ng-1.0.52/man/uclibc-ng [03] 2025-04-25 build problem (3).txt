@@ -1,0 +1,45 @@
+
+billylin@billylin-VirtualBox:~/yllib__mybase/test_git_project/uClibc-ng-1.0.52$ make build
+Building uClibc-ng...
+make[1]: Entering directory '/home/billylin/yllib__mybase/test_git_project/uClibc-ng-1.0.52/uclibc-ng'
+  CC ldso/ldso/ldso.oS
+In file included from ldso/ldso/ldso.c:32:
+./ldso/include/ldso.h:47:10: fatal error: bits/uClibc_page.h: No such file or directory
+   47 | #include <bits/uClibc_page.h>
+      |          ^~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[1]: *** [Makerules:374: ldso/ldso/ldso.oS] Error 1
+make[1]: Leaving directory '/home/billylin/yllib__mybase/test_git_project/uClibc-ng-1.0.52/uclibc-ng'
+make: *** [Makefile:102: build] Error 2
+
+
++----------------------------------------
++======================================== 解決
+
+
+billylin@billylin-VirtualBox:~/yllib__mybase/test_git_project/uClibc-ng-1.0.52$ find uclibc-ng/ -iname uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/lm32/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/microblaze/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/mips/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/alpha/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/m68k/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/arc/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/sparc64/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/cris/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/or1k/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/nds32/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/riscv64/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/riscv32/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/aarch64/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/frv/bits/uClibc_page.h
+uclibc-ng/libc/sysdeps/linux/common/bits/uClibc_page.h
+uclibc-ng/include/bits/uClibc_page.h
+
+
+billylin@billylin-VirtualBox:~/yllib__mybase/test_git_project/uClibc-ng-1.0.52$ ls -al uclibc-ng/include/bits/uClibc_page.h
+lrwxrwxrwx 1 billylin billylin 50  四  25 10:19 uclibc-ng/include/bits/uClibc_page.h -> ../../libc/sysdeps/linux/common/bits/uClibc_page.h
+
+
+
+
+

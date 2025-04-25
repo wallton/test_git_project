@@ -1,7 +1,7 @@
 
 # 定義多個目錄
-DIRS := buildL
-PREFIX := $(CURDIR)/buildDir
+DIR_OUTPUT := buildL
+PREFIX := $(CURDIR)/$(DIR_OUTPUT)
 UCLIBC_DIR := uclibc-ng
 GIT_URL := https://github.com/wbx-github/uclibc-ng.git
 KERNEL_INC_DIR := /tmp/kernel-headers
@@ -9,7 +9,7 @@ KERNEL_VER_MAJOR := $(shell uname -r | cut -d. -f1)
 KERNEL_VER := $(shell uname -r | cut -d. -f1-2)
 
 .PHONY: all config build install clean distclean
-all: $(DIRS) build
+all: $(DIR_OUTPUT) build
 
 
 
@@ -28,7 +28,7 @@ demo:
 
 
 # 檢查並創建目錄
-$(DIRS):
+$(DIR_OUTPUT):
 	@mkdir -p $@
 
 # @@@安裝全過程 https://github.com/wbx-github/uclibc-ng/blob/master/INSTALL
@@ -97,14 +97,14 @@ menuconfig: $(UCLIBC_DIR)
 	@echo "Please configure the target architecture and save the config."
 
 # 編譯 uClibc-ng
-build: $(UCLIBC_DIR)
+build: $(UCLIBC_DIR) prerequisite
 	@echo "Building uClibc-ng..."
-	@cd $(UCLIBC_DIR) && make
+	@cd $(UCLIBC_DIR) && make CFLAGS="-I$(KERNEL_INC_DIR)/include -I$(CURDIR)/$(UCLIBC_DIR)/include"
 
 # 安裝 uClibc-ng 到指定路徑
 #  DEVEL_PREFIX  ：開發文件（頭文件、靜態庫）的安裝路徑。
 #  RUNTIME_PREFIX：運行時文件（動態庫）的安裝路徑
-install:
+install: $(PREFIX)
 	@echo "Installing uClibc-ng to $(PREFIX)..."
 	@cd $(UCLIBC_DIR) && make PREFIX=$(PREFIX) DEVEL_PREFIX=/uclibc-ng/dev/ RUNTIME_PREFIX=/uclibc-ng/run/ install
 
@@ -112,7 +112,7 @@ install:
 clean:
 	@echo "Cleaning uClibc-ng build..."
 	@cd $(UCLIBC_DIR) && make clean
-	@for dir in $(DIRS); do \
+	@for dir in $(DIR_OUTPUT); do \
 		if test -d $$dir; then \
 			rm -r $$dir; \
 			echo "Removed $$dir"; \
