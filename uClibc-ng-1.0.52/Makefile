@@ -1,6 +1,6 @@
 
 # 定義多個目錄
-DIRS := buildDir
+DIRS := buildL
 PREFIX := $(CURDIR)/buildDir
 UCLIBC_DIR := uclibc-ng
 GIT_URL := https://github.com/wbx-github/uclibc-ng.git
@@ -66,11 +66,19 @@ prerequisite:
 
 
 
-# Download uClibc-ng
+# Download from github
+#
+#$(UCLIBC_DIR):
+#	@echo "cloning uClibc-ng repository..."
+#	@git clone $(GIT_URL) $(UCLIBC_DIR)
+#	@cd $(UCLIBC_DIR)
+
+# Download from https://downloads.uclibc-ng.org/releases/1.0.52/
+#
 $(UCLIBC_DIR):
-	@echo "Cloning uClibc-ng repository..."
-	@git clone $(GIT_URL) $(UCLIBC_DIR)
-	@cd $(UCLIBC_DIR)
+	@echo "untar uClibc-ng repository..."
+	tar Jxvf uClibc-ng-1.0.52.tar.xz ; \
+	mv -i uClibc-ng-1.0.52 $(UCLIBC_DIR)
 
 # 配置 uClibc-ng
 
@@ -106,7 +114,7 @@ clean:
 	@cd $(UCLIBC_DIR) && make clean
 	@for dir in $(DIRS); do \
 		if test -d $$dir; then \
-			@rm -r $$dir; \
+			rm -r $$dir; \
 			echo "Removed $$dir"; \
 		fi; \
 	done
@@ -116,7 +124,7 @@ clean:
 distclean:
 	@echo "Removing uClibc-ng directory..."
 	@if [ -n "$(UCLIBC_DIR)" ]; then \
-		@rm -rf $(UCLIBC_DIR); \
+		rm -rf $(UCLIBC_DIR); \
 		echo "Removed: $(UCLIBC_DIR)"; \
 	fi
 
