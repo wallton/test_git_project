@@ -1,5 +1,5 @@
-
-# 定義多個目錄
+#
+#
 DIR_OUTPUT := buildL
 PREFIX := $(CURDIR)/$(DIR_OUTPUT)
 UCLIBC_DIR := uclibc-ng
