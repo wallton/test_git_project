@@ -23,6 +23,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <resolv.h>
+#include <ctype.h> /* isspace */
 
 #define DEBUG
 #ifdef DEBUG
@@ -32,6 +34,7 @@
 #endif
 
 /* 常量定義 */
+/*
 #define HFIXEDSZ 12
 #define QFIXEDSZ 4
 #define RRFIXEDSZ 10
@@ -49,6 +52,9 @@
 #define RES_TIMEOUT 5
 #define RES_DFLRETRY 2
 #define NAMESERVER_PORT 53
+*/
+#define MAX_ALIASES 4
+#define MAX_ADDRS 16
 
 /* 結構定義 */
 struct resolv_header {
@@ -58,6 +64,12 @@ struct resolv_header {
     int ancount;
     int nscount;
     int arcount;
+};
+
+struct resolv_question {
+	char *dotted;
+	int qtype;
+	int qclass;
 };
 
 struct resolv_answer {
@@ -76,9 +88,7 @@ struct resolv_answer {
 typedef union sockaddr46_t {
     struct sockaddr sa;
     struct sockaddr_in sa4;
-#ifdef __UCLIBC_HAS_IPV6__
     struct sockaddr_in6 sa6;
-#endif
 } sockaddr46_t;
 
 /* 全局變數（模擬 resolv.c 的行為） */
@@ -86,7 +96,15 @@ static unsigned __nameservers = 0;
 static sockaddr46_t *__nameserver = NULL;
 static uint8_t __resolv_timeout = RES_TIMEOUT;
 static uint8_t __resolv_attempts = RES_DFLRETRY;
-static int h_errno = 0;
+static char *user_dns_setting = NULL;
+
+/* gethostbyname2 相關結構 */
+static struct hostent __hostent;
+static char __hostent_buf[1024];
+static char * __hostent_aliases[MAX_ALIASES];
+static char * __hostent_addr_list[MAX_ADDRS];
+static char __hostent_addr_buf[MAX_ADDRS * (sizeof(struct in6_addr) > sizeof(struct in_addr) ? sizeof(struct in6_addr) : sizeof(struct in_addr))];
+
 
 /* 輔助函數 */
 static char *skip_nospace(char *p) {
@@ -113,9 +131,61 @@ static char *skip_and_NUL_space(char *p) {
     return p;
 }
 
+char * retIP_address(sockaddr46_t *srv)
+{
+    static char ipAddr_str[64] = {0};
+    if(srv)
+    {
+        if( AF_INET == srv->sa.sa_family )
+        {
+            inet_ntop(AF_INET, &(srv->sa4.sin_addr), ipAddr_str, 64);
+        }
+        else if ( AF_INET6 == srv->sa.sa_family )
+        {
+            inet_ntop(AF_INET6, &(srv->sa6.sin6_addr), ipAddr_str, 64);
+        }
+    }
+    return &ipAddr_str[0];
+}
+
+void __open_nameservers_with_user_dns(const char *user_dns) {
+    sockaddr46_t sa;
+
+    /* 清空現有的 user_dns_setting */
+    if (user_dns_setting) {
+        free(user_dns_setting);
+        user_dns_setting = NULL;
+    }
+
+    /* 如果使用者指定了 DNS 伺服器，驗證並設置 */
+    if (user_dns && *user_dns)
+    {
+        memset(&sa, 0, sizeof(sa));
+        if (inet_pton(AF_INET, user_dns, &sa.sa4.sin_addr) > 0) {
+            sa.sa4.sin_family = AF_INET;
+            sa.sa4.sin_port = htons(NAMESERVER_PORT);
+        }
+        else if (inet_pton(AF_INET6, user_dns, &sa.sa6.sin6_addr) > 0) {
+            sa.sa6.sin6_family = AF_INET6;
+            sa.sa6.sin6_port = htons(NAMESERVER_PORT);
+        }
+        else {
+            DPRINTF("Invalid DNS server address: %s\n", user_dns);
+            return;
+        }
+
+        /* 儲存 user_dns 並初始化 __nameserver */
+        user_dns_setting = strdup(user_dns);
+        if (!user_dns_setting) {
+            DPRINTF("Failed to allocate memory for user_dns_setting\n");
+            return;
+        }
+    }
+}
+
 void __open_nameservers(void) {
     char szBuffer[128];
-    FILE *fp;
+    FILE *fp = NULL;
     sockaddr46_t sa;
     void *ptr;
 
@@ -125,6 +195,40 @@ void __open_nameservers(void) {
         __nameserver = NULL;
     }
 
+    /* 如果使用者指定了 DNS server，優先使用 */
+    if (user_dns_setting && *user_dns_setting)
+    {
+        memset(&sa, 0, sizeof(sa));
+        if (inet_pton(AF_INET, user_dns_setting, &sa.sa4.sin_addr) > 0) {
+            sa.sa4.sin_family = AF_INET;
+            sa.sa4.sin_port = htons(NAMESERVER_PORT);
+        }
+        else if (inet_pton(AF_INET6, user_dns_setting, &sa.sa6.sin6_addr) > 0) {
+            sa.sa6.sin6_family = AF_INET6;
+            sa.sa6.sin6_port = htons(NAMESERVER_PORT);
+        }
+        else {
+            DPRINTF("Invalid user DNS server address: %s\n", user_dns_setting);
+            /* 清空無效的 user_dns_setting，繼續後續邏輯 */
+            free(user_dns_setting);
+            user_dns_setting = NULL;
+        }
+
+        if (user_dns_setting) {
+            __nameserver = malloc(sizeof(sockaddr46_t));
+            if (__nameserver) {
+                __nameserver[0] = sa;
+                __nameservers = 1;
+                return;
+            }
+            DPRINTF("Failed to allocate memory for user nameserver\n");
+            free(user_dns_setting);
+            user_dns_setting = NULL;
+        }
+    }
+
+
+    /* 否則從 /etc/resolv.conf 讀取 */
     fp = fopen("/etc/resolv.conf", "r");
     if (!fp) {
         DPRINTF("Failed to open /etc/resolv.conf\n");
@@ -153,12 +257,10 @@ void __open_nameservers(void) {
                 sa.sa4.sin_family = AF_INET;
                 sa.sa4.sin_port = htons(NAMESERVER_PORT);
             }
-#ifdef __UCLIBC_HAS_IPV6__
             else if (inet_pton(AF_INET6, p, &sa.sa6.sin6_addr) > 0) {
                 sa.sa6.sin6_family = AF_INET6;
                 sa.sa6.sin6_port = htons(NAMESERVER_PORT);
             }
-#endif
             else
                 continue;
 
@@ -188,6 +290,11 @@ void __close_nameservers(void) {
         __nameserver = NULL;
     }
     __nameservers = 0;
+
+    if (user_dns_setting) {
+        free(user_dns_setting);
+        user_dns_setting = NULL;
+    }
 }
 
 int __encode_header(struct resolv_header *h, unsigned char *dest, int maxlen) {
@@ -295,6 +402,7 @@ int __form_query(int id, const char *name, int type, unsigned char *packet, int 
     memset(&h, 0, sizeof(h));
     h.id = id;
     h.qdcount = 1;
+    h.rd = 1;
 
     q.dotted = (char *)name;
     q.qtype = type;
@@ -394,6 +502,8 @@ try_next_server:
         return -1;
     }
 
+printf("\nTry DNS Server : %s\n\n", retIP_address(&__nameserver[nameserver_idx]) );
+
     fd = socket(__nameserver[nameserver_idx].sa.sa_family, SOCK_DGRAM, 0);
     if (fd < 0) {
         nameserver_idx++;
@@ -452,47 +562,6 @@ try_next_server:
     return ret;
 }
 
-int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen) {
-    int i;
-    unsigned char *packet = NULL;
-    struct resolv_answer a;
-    struct resolv_header h;
-
-    if (!dname || class != C_IN) {
-        h_errno = NO_RECOVERY;
-        return -1;
-    }
-
-    __open_nameservers();
-    if (__nameservers == 0) {
-        h_errno = NO_ADDRESS;
-        return -1;
-    }
-
-    memset(&a, 0, sizeof(a));
-    i = __dns_lookup(dname, type, &packet, &a);
-    if (i < 0) {
-        if (!h_errno)
-            h_errno = TRY_AGAIN;
-        return -1;
-    }
-
-    __decode_header(packet, &h);
-    if (h.tc) {
-        /* TC bit 設置，切換到 TCP */
-        free(packet);
-        free(a.dotted);
-        return res_query_tcp(dname, class, type, answer, anslen);
-    }
-
-    free(a.dotted);
-    if (i > anslen)
-        i = anslen;
-    memcpy(answer, packet, i);
-    free(packet);
-    return i;
-}
-
 int res_query_tcp(const char *dname, int class, int type, unsigned char *answer, int anslen) {
     struct resolv_header h;
     unsigned char *packet = NULL;
@@ -524,7 +593,7 @@ int res_query_tcp(const char *dname, int class, int type, unsigned char *answer,
         return -1;
     }
 
-    __open_nameservers();
+
     if (__nameservers == 0) {
         free(packet);
         free(buf);
@@ -554,6 +623,8 @@ try_next_server:
         h_errno = TRY_AGAIN;
         return -1;
     }
+
+printf("\nTry DNS Server : %s\n\n", retIP_address(&__nameserver[nameserver_idx]) );
 
     fd = socket(__nameserver[nameserver_idx].sa.sa_family, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -661,57 +732,419 @@ try_next_server:
     return len;
 }
 
-/* 解析回應並提取 IP 地址 */
-void parse_answer(unsigned char *answer, int anslen) {
+
+int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen) {
+    int i;
+    unsigned char *packet = NULL;
+    struct resolv_answer a;
+    struct resolv_header h;
+
+    if (!dname || class != C_IN) {
+        h_errno = NO_RECOVERY;
+        return -1;
+    }
+
+    if (__nameservers == 0) {
+        h_errno = NO_ADDRESS;
+        return -1;
+    }
+
+    memset(&a, 0, sizeof(a));
+    i = __dns_lookup(dname, type, &packet, &a);
+    if (i < 0) {
+        if (!h_errno)
+            h_errno = TRY_AGAIN;
+        return -1;
+    }
+
+    __decode_header(packet, &h);
+    if (h.tc) {
+        /* TC bit 設置，切換到 TCP */
+        free(packet);
+        free(a.dotted);
+        return res_query_tcp(dname, class, type, answer, anslen);
+    }
+
+    free(a.dotted);
+    if (i > anslen)
+        i = anslen;
+    memcpy(answer, packet, i);
+    free(packet);
+    return i;
+}
+
+/* gethostbyname2 實現 */
+struct hostent *gethostbyname2(const char *name, int af) {
+    unsigned char answer[65536] = {0};
+    char temp[MAXDNAME] = {0};
+    int len, type, i, offset;
     struct resolv_header h;
     struct resolv_answer a;
-    int offset = HFIXEDSZ;
-    int i;
+    char *bufptr = __hostent_buf;
+    char *addrptr = __hostent_addr_buf;
+    int addr_count = 0;
+    size_t bufsize = sizeof(__hostent_buf);
+    size_t addr_bufsize = sizeof(__hostent_addr_buf);
 
+    if (!name || (af != AF_INET && af != AF_INET6)) {
+        h_errno = NO_RECOVERY;
+        return NULL;
+    }
+
+    /* 如果尚未初始化 nameserver，調用 __open_nameservers */
+    if (__nameservers == 0) {
+        __open_nameservers();
+        if (__nameservers == 0) {
+            h_errno = NO_ADDRESS;
+            return NULL;
+        }
+    }
+
+
+    type = (af == AF_INET) ? T_A : T_AAAA;
+    len = res_query(name, C_IN, type, answer, sizeof(answer));
+    if (len < 0) {
+        __close_nameservers();
+        return NULL;
+    }
+
+    /* 初始化 hostent */
+    memset(&__hostent, 0, sizeof(__hostent));
+    memset(__hostent_aliases, 0, sizeof(__hostent_aliases));
+    memset(__hostent_addr_list, 0, sizeof(__hostent_addr_list));
+    memset(__hostent_buf, 0, sizeof(__hostent_buf));
+    memset(__hostent_addr_buf, 0, sizeof(__hostent_addr_buf));
+
+    /* 設置 hostent 的基本資訊 */
+    __hostent.h_name = bufptr;
+    strncpy(bufptr, name, bufsize);
+    bufptr += strlen(name) + 1;
+    bufsize -= strlen(name) + 1;
+    __hostent.h_aliases = __hostent_aliases;
+    __hostent.h_addrtype = af;
+    __hostent.h_length = (af == AF_INET) ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+    __hostent.h_addr_list = __hostent_addr_list;
+
+    /* 解析回應 */
     __decode_header(answer, &h);
+    offset = HFIXEDSZ;
     if (h.qdcount > 0) {
-        /* 跳過問題部分 */
-        offset += __decode_dotted(answer, offset, anslen, a.dotted, MAXDNAME);
+        offset += __decode_dotted(answer, offset, len, temp, MAXDNAME);
         offset += 4; /* QTYPE 和 QCLASS */
     }
 
-    for (i = 0; i < h.ancount; i++) {
+    for (i = 0; i < h.ancount && addr_count < MAX_ADDRS; i++) {
         memset(&a, 0, sizeof(a));
-        int ret = __decode_answer(answer, offset, anslen, &a);
+        int ret = __decode_answer(answer, offset, len, &a);
         if (ret < 0) {
             DPRINTF("Failed to decode answer\n");
+            free(a.dotted);
             break;
         }
 
-        if (a.atype == T_A && a.aclass == C_IN && a.rdlength == 4) {
-            char ip[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, a.rdata, ip, sizeof(ip));
-            printf("IP: %s\n", ip);
+        if (a.atype == type && a.aclass == C_IN && a.rdlength == __hostent.h_length) {
+            if (addr_bufsize < a.rdlength) {
+                DPRINTF("Address buffer overflow\n");
+                free(a.dotted);
+                break;
+            }
+            memcpy(addrptr, a.rdata, a.rdlength);
+            __hostent_addr_list[addr_count] = addrptr;
+            addrptr += a.rdlength;
+            addr_bufsize -= a.rdlength;
+            addr_count++;
         }
         free(a.dotted);
         offset += ret;
     }
-}
 
-int main(int argc, char *argv[]) {
-    unsigned char answer[65536];
-    int len;
-
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <domain>\n", argv[0]);
-        return 1;
-    }
-
-    len = res_query(argv[1], C_IN, T_A, answer, sizeof(answer));
-    if (len < 0) {
-        fprintf(stderr, "Query failed: h_errno=%d\n", h_errno);
+    __hostent_addr_list[addr_count] = NULL;
+    if (addr_count == 0) {
+        h_errno = NO_DATA;
         __close_nameservers();
-        return 1;
+        return NULL;
     }
-
-    printf("Query succeeded, received %d bytes\n", len);
-    parse_answer(answer, len);
 
     __close_nameservers();
+    return &__hostent;
+}
+
+/* 解析並輸出 hostent 結果 */
+void print_hostent(struct hostent *h) {
+    int i;
+    char addr_str[INET6_ADDRSTRLEN];
+
+    if (!h) {
+        printf("No results found\n");
+        return;
+    }
+
+    printf("Name: %s\n", h->h_name);
+    for (i = 0; h->h_addr_list[i]; i++) {
+        inet_ntop(h->h_addrtype, h->h_addr_list[i], addr_str, sizeof(addr_str));
+        printf("Address (%s): %s\n", h->h_addrtype == AF_INET ? "IPv4" : "IPv6", addr_str);
+    }
+}
+
+
+static int parse_reply(const unsigned char *msg, size_t len)
+{
+	HEADER *header;
+
+	ns_msg handle;
+	ns_rr rr;
+	int i, n, rdlen;
+	const char *format = NULL;
+	char astr[INET6_ADDRSTRLEN], dname[MAXDNAME];
+	const unsigned char *cp;
+
+	header = (HEADER *)msg;
+	if (!header->aa)
+		printf("Non-authoritative answer:\n");
+
+	if (ns_initparse(msg, len, &handle) != 0) {
+		printf("Unable to parse reply: %s\n", strerror(errno));
+		return -1;
+	}
+
+	for (i = 0; i < ns_msg_count(handle, ns_s_an); i++)
+    {
+		if (ns_parserr(&handle, ns_s_an, i, &rr) != 0) {
+			printf("Unable to parse resource record: %s\n", strerror(errno));
+			return -1;
+		}
+
+		rdlen = ns_rr_rdlen(rr);
+
+		switch (ns_rr_type(rr))
+		{
+		case ns_t_a:
+			if (rdlen != 4) {
+				printf("unexpected A record length %d\n", rdlen);
+				return -1;
+			}
+			inet_ntop(AF_INET, ns_rr_rdata(rr), astr, sizeof(astr));
+			printf("Name:\t%s\nAddress: %s\n", ns_rr_name(rr), astr);
+			break;
+
+
+		case ns_t_aaaa:
+			if (rdlen != 16) {
+				printf("unexpected AAAA record length %d\n", rdlen);
+				return -1;
+			}
+			inet_ntop(AF_INET6, ns_rr_rdata(rr), astr, sizeof(astr));
+			/* bind-utils-9.11.3 uses the same format for A and AAAA answers */
+			printf("Name:\t%s\nAddress: %s\n", ns_rr_name(rr), astr);
+			break;
+
+
+		case ns_t_ns:
+			if (!format)
+				format = "%s\tnameserver = %s\n";
+			/* fall through */
+
+		case ns_t_cname:
+			if (!format)
+				format = "%s\tcanonical name = %s\n";
+			/* fall through */
+
+		case ns_t_ptr:
+			if (!format)
+				format = "%s\tname = %s\n";
+			if (ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
+					ns_rr_rdata(rr), dname, sizeof(dname)) < 0
+			) {
+				//printf("Unable to uncompress domain: %s\n", strerror(errno));
+				return -1;
+			}
+			printf(format, ns_rr_name(rr), dname);
+			break;
+
+		case ns_t_mx:
+			if (rdlen < 2) {
+				printf("MX record too short\n");
+				return -1;
+			}
+			n = ns_get16(ns_rr_rdata(rr));
+			if (ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
+					ns_rr_rdata(rr) + 2, dname, sizeof(dname)) < 0
+			) {
+				//printf("Cannot uncompress MX domain: %s\n", strerror(errno));
+				return -1;
+			}
+			printf("%s\tmail exchanger = %d %s\n", ns_rr_name(rr), n, dname);
+			break;
+
+		case ns_t_txt:
+			if (rdlen < 1) {
+				//printf("TXT record too short\n");
+				return -1;
+			}
+			n = *(unsigned char *)ns_rr_rdata(rr);
+			if (n > 0) {
+				memset(dname, 0, sizeof(dname));
+				memcpy(dname, ns_rr_rdata(rr) + 1, n);
+				printf("%s\ttext = \"%s\"\n", ns_rr_name(rr), dname);
+			}
+			break;
+
+		case ns_t_soa:
+			if (rdlen < 20) {
+				printf("SOA record too short:%d\n", rdlen);
+				return -1;
+			}
+
+			printf("%s\n", ns_rr_name(rr));
+
+			cp = ns_rr_rdata(rr);
+			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
+			                       cp, dname, sizeof(dname));
+			if (n < 0) {
+				//printf("Unable to uncompress domain: %s\n", strerror(errno));
+				return -1;
+			}
+
+			printf("\torigin = %s\n", dname);
+			cp += n;
+
+			n = ns_name_uncompress(ns_msg_base(handle), ns_msg_end(handle),
+			                       cp, dname, sizeof(dname));
+			if (n < 0) {
+				//printf("Unable to uncompress domain: %s\n", strerror(errno));
+				return -1;
+			}
+
+			printf("\tmail addr = %s\n", dname);
+			cp += n;
+
+			printf("\tserial = %lu\n", ns_get32(cp));
+			cp += 4;
+
+			printf("\trefresh = %lu\n", ns_get32(cp));
+			cp += 4;
+
+			printf("\tretry = %lu\n", ns_get32(cp));
+			cp += 4;
+
+			printf("\texpire = %lu\n", ns_get32(cp));
+			cp += 4;
+
+			printf("\tminimum = %lu\n", ns_get32(cp));
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	return i;
+}
+
+void nslookup_ipv6(const char *domain)
+{
+    unsigned char buf[65536];
+    ns_msg handle;
+    char ip[INET6_ADDRSTRLEN];
+    int i=0;
+
+    __open_nameservers();
+
+    int len = res_query(domain, ns_c_in, ns_t_aaaa, buf, sizeof(buf));
+    if (len < 0) {
+printf("billy(%s# %d) Failed\n", __func__, __LINE__);
+        fprintf(stderr, "Query failed: h_errno=%d\n", h_errno);
+        return ;
+    }
+
+    printf("\nQuery succeeded, received %d bytes\n", len);
+#if 0
+    ns_initparse(buf, len, &handle);
+    for (i = 0; i < ns_msg_count(handle, ns_s_an); i++) {
+        ns_rr rr;
+        ns_parserr(&handle, ns_s_an, i, &rr);
+        if (ns_rr_type(rr) == ns_t_aaaa) {
+
+            inet_ntop(AF_INET6, ns_rr_rdata(rr), ip, sizeof(ip));
+            printf("IPv6: %s\n", ip);
+        }
+    }
+#else
+    parse_reply(buf, len);
+#endif
+    __close_nameservers();
+    return ;
+}
+
+void nslookup_ipv4(const char *domain)
+{
+    unsigned char buf[65536] = {0};
+    ns_msg handle;
+    char ip[INET6_ADDRSTRLEN];
+    int  i=0;
+    int  len;
+
+    __open_nameservers();
+
+    len = res_query(domain, C_IN, T_A, buf, sizeof(buf));
+    if (len < 0) {
+        fprintf(stderr, "Query failed: h_errno=%d\n", h_errno);
+        return ;
+    }
+
+    printf("\nQuery succeeded, received %d bytes\n", len);
+
+#if 0
+    ns_initparse(buf, len, &handle);
+    for (i = 0; i < ns_msg_count(handle, ns_s_an); i++) {
+        ns_rr rr;
+        ns_parserr(&handle, ns_s_an, i, &rr);
+        if (ns_rr_type(rr) == ns_t_a) {
+
+            inet_ntop(AF_INET, ns_rr_rdata(rr), ip, sizeof(ip));
+            printf("IPv4: %s\n", ip);
+        }
+    }
+
+#else
+    parse_reply(buf, len);
+#endif
+    __close_nameservers();
+    return ;
+}
+
+
+int main(int argc, char *argv[])
+{
+    const char *domain;
+    const char *dns_server = NULL;
+    struct hostent *h;
+
+    if (argc < 2 || argc > 3) {
+        fprintf(stderr, "Usage: %s <domain> [dns_server]\n", argv[0]);
+        return 1;
+    }
+
+    domain = argv[1];
+    if (argc == 3) {
+        dns_server = argv[2];
+        __open_nameservers_with_user_dns(dns_server);
+    }
+
+
+#if 1
+    printf("Querying %s (IPv4)...\n", domain);
+    h = gethostbyname2(domain, AF_INET);
+    print_hostent(h);
+
+    printf("Querying %s (IPv6)...\n", domain);
+    h = gethostbyname2(domain, AF_INET6);
+    print_hostent(h);
+
+#else
+    nslookup_ipv4(domain);
+    nslookup_ipv6(domain);
+#endif
+
     return 0;
 }
