@@ -418,21 +418,29 @@ int __form_query(int id, const char *name, int type, unsigned char *packet, int 
 
     return i + j;
 }
-
+#if 0
 int __decode_dotted(const unsigned char *packet, int offset, int packet_len, char *dest, int dest_len) {
     int len = 0, i;
     const unsigned char *p = packet + offset;
     char *q = dest;
 
+printf("billy(%s# %d) NS_CMPRSFLGS (0x%x) \n", __func__, __LINE__, NS_CMPRSFLGS); 
+
     while (*p && len < dest_len - 1) {
+
+printf("billy(%s# %d) *p= 0x%x \n", __func__, __LINE__, *p);
+
         if ((*p & NS_CMPRSFLGS) == NS_CMPRSFLGS) {
             /* 壓縮名稱，尚未實現 */
+printf("billy(%s# %d) ----- \n", __func__, __LINE__);
             return -1;
         }
 
         i = *p++;
-        if (i > 63 || len + i + 1 >= dest_len)
+        if (i > 63 || len + i + 1 >= dest_len) {
+printf("billy(%s# %d) i(%d) x=%d dest_len=%d\n", __func__, __LINE__, i, (len + i + 1), dest_len);
             return -1;
+        }
 
         memcpy(q, p, i);
         q += i;
@@ -449,11 +457,77 @@ int __decode_dotted(const unsigned char *packet, int offset, int packet_len, cha
     return p - (packet + offset);
 }
 
+#endif
+/* Decode a dotted string from nameserver transport-level encoding.
+   This routine understands compressed data. */
+int __decode_dotted(const unsigned char *packet, int offset, int packet_len, char *dest, int dest_len)
+{
+	unsigned b;
+	unsigned measure = 1;
+	unsigned total = 0;
+	unsigned used = 0;
+
+	if (!packet)
+		return -1;
+
+	while (1) {
+		if (offset >= packet_len)
+			return -1;
+        
+		b = packet[offset++];
+
+printf("billy(%s# %d) b= 0x%x \n", __func__, __LINE__, b);
+
+		if (b == 0)
+			break;
+
+		if (measure)
+			total++;
+
+		if ((b & 0xc0) == 0xc0) {
+			if (offset >= packet_len)
+				return -1;
+			if (measure)
+				total++;
+			/* compressed item, redirect */
+			offset = ((b & 0x3f) << 8) | packet[offset];
+			measure = 0;
+			continue;
+		}
+
+		if (used + b + 1 >= dest_len)
+			return -1;
+		if (offset + b >= packet_len)
+			return -1;
+		memcpy(dest + used, packet + offset, b);
+		offset += b;
+		used += b;
+
+		if (measure)
+			total += b;
+
+		if (packet[offset] != 0)
+			dest[used++] = '.';
+		else
+			dest[used++] = '\0';
+	}
+
+	/* The null byte must be counted too */
+	if (measure)
+		total++;
+
+	//DPRINTF("Total decode len = %d\n", total);
+
+	return total;
+}
+
+
 int __decode_answer(const unsigned char *message, int offset, int len, struct resolv_answer *a) {
     char temp[MAXDNAME];
     int i;
 
     i = __decode_dotted(message, offset, len, temp, sizeof(temp));
+printf("billy(%s# %d) i(%d)\n", __func__, __LINE__, i);
     if (i < 0)
         return i;
 
@@ -732,7 +806,6 @@ printf("\nTry DNS Server : %s\n\n", retIP_address(&__nameserver[nameserver_idx])
     return len;
 }
 
-
 int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen) {
     int i;
     unsigned char *packet = NULL;
@@ -825,17 +898,23 @@ struct hostent *gethostbyname2(const char *name, int af) {
     __hostent.h_length = (af == AF_INET) ? sizeof(struct in_addr) : sizeof(struct in6_addr);
     __hostent.h_addr_list = __hostent_addr_list;
 
+//printf("billy(%s# %d) HFIXEDSZ(%d)\n", __func__, __LINE__, HFIXEDSZ);
+
     /* 解析回應 */
     __decode_header(answer, &h);
     offset = HFIXEDSZ;
     if (h.qdcount > 0) {
         offset += __decode_dotted(answer, offset, len, temp, MAXDNAME);
+//printf("billy(%s# %d) offset(%d) \n", __func__, __LINE__, offset);
         offset += 4; /* QTYPE 和 QCLASS */
     }
+
+//printf("billy(%s# %d) offset(%d) len(%d)\n", __func__, __LINE__, offset, len);
 
     for (i = 0; i < h.ancount && addr_count < MAX_ADDRS; i++) {
         memset(&a, 0, sizeof(a));
         int ret = __decode_answer(answer, offset, len, &a);
+printf("billy(%s# %d) ret(%d) offset(%d) \n", __func__, __LINE__, ret, offset);
         if (ret < 0) {
             DPRINTF("Failed to decode answer\n");
             free(a.dotted);
