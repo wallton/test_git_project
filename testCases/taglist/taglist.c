@@ -703,12 +703,9 @@ static int __search_taglist(const tagListType *list, const char *tag)
 		tagItemType *item = &tmp;
 
 		item->tag = (char *)tag;
-		i = bsearch_pos(&item, list->item, list->size,
-			sizeof(tagItemType *),
-			__tagitem_tag_compare_func);
+		i = bsearch_pos(&item, list->item, list->size, sizeof(tagItemType *), __tagitem_tag_compare_func);
 		if (i < list->size &&
-			__tagitem_tag_compare_func(&item,
-			list->item + i) == 0) {
+			__tagitem_tag_compare_func(&item, list->item + i) == 0) {
 			pos = i;
 		}
 	} else {

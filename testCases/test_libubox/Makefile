@@ -21,7 +21,9 @@ CFLAGS += -L$(CURDIR)/$(OUT_DIR)/libubox/lib
 #  LD_LIBRARY_PATH=$PWD/testCases/test_libubox/buildDir/libubox/lib:$PWD/testCases/test_libubox/buildDir/jsonc/lib:$LD_LIBRARY_PATH ./testCases/test_libubox/test
 #
 all:
-	gcc -o test main.c $(CFLAGS) 
+	@gcc -o test main.c $(CFLAGS) 
+	@gcc -o test2 main2.c $(CFLAGS) 
+	@gcc -o test3 main3.c $(CFLAGS) 
 
 
 check-libubox-file:
